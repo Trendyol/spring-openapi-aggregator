@@ -1,1 +1,5 @@
 rootProject.name = 'spring-openapi-aggregator'
+include ':spring-openapi-aggregator-webflux', ':spring-openapi-aggregator-mvc'
+
+project(':spring-openapi-aggregator-webflux').projectDir = file('spring-openapi-aggregator-webflux')
+project(':spring-openapi-aggregator-mvc').projectDir = file('spring-openapi-aggregator-mvc')

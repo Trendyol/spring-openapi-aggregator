@@ -1,7 +1,10 @@
 package com.trendyol.openapiaggregator;
 
-import com.trendyol.openapiaggregator.autoconfigure.OpenApiAggregatorAutoConfiguration;
-import org.springframework.context.annotation.Import;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Enabling annotation to activate the OpenAPI Aggregator library.
@@ -9,6 +12,8 @@ import org.springframework.context.annotation.Import;
  * Add {@code @EnableOpenApiAggregator} to your Spring Boot application class
  * to import the aggregator controller, services and configuration properties.
  */
-@Import(OpenApiAggregatorAutoConfiguration.class)
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
 public @interface EnableOpenApiAggregator {
 }

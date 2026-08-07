@@ -6,6 +6,7 @@ import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import com.trendyol.openapiaggregator.dto.RouteInfo;
+import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;

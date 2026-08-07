@@ -1,7 +1,8 @@
-package com.trendyol.openapiaggregator.rest;
+package com.trendyol.openapiaggregator.webflux.rest;
 
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
+import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
@@ -20,8 +21,8 @@ import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.MISSIN
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.OPENAPI_VERSION;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.ORDERS;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.ORDERS_URI;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -38,19 +39,23 @@ class GatewayOpenApiAggregatorTest {
     void fetchesAndCustomizesAServiceDocumentUsingItsOverride() {
         RouteDefinition route = route(ORDERS, ORDERS_URI);
         RouteDefinitionLocator locator = () -> Flux.just(route);
-        WebClient.Builder builder = WebClient.builder().exchangeFunction(_ ->
+        RouteDefinitionAccessor routeAccessor = mock(RouteDefinitionAccessor.class);
+        when(routeAccessor.getPredicates(ORDERS)).thenReturn(Mono.just(java.util.Map.of()));
+        when(routeAccessor.getFilterConfigs(ORDERS)).thenReturn(Mono.just(java.util.Map.of()));
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(ignored ->
                 Mono.just(ClientResponse.create(org.springframework.http.HttpStatus.OK)
                         .header("Content-Type", "application/json")
                         .body("{\"openapi\":\"" + OPENAPI_VERSION + "\",\"paths\":{}}")
                         .build()));
         OpenApiRouteCustomizer customizer = mock(OpenApiRouteCustomizer.class);
-        when(customizer.applyOpenApiCustomisations(any())).thenReturn(Mono.just(CUSTOMIZED));
+        when(customizer.applyOpenApiCustomisations(any(), any(), any())).thenReturn(CUSTOMIZED);
         OpenApiOverridesConfig overrides = new OpenApiOverridesConfig();
         OpenApiOverridesConfig.ServiceOverrides service = new OpenApiOverridesConfig.ServiceOverrides();
         service.setBaseUrl(DOCS_PATH);
         overrides.getOverrides().put(ORDERS, service);
 
-        GatewayOpenApiAggregator aggregator = new GatewayOpenApiAggregator(locator, builder, customizer, overrides);
+        GatewayOpenApiAggregator aggregator = new GatewayOpenApiAggregator(
+                locator, routeAccessor, builder, customizer, overrides);
 
         assertThat(aggregator.getServiceDocs(ORDERS).block()).isEqualTo(CUSTOMIZED);
     }
@@ -58,12 +63,15 @@ class GatewayOpenApiAggregatorTest {
     @Test
     void returnsEmptyUnifiedSpecWhenAServiceDocumentCannotBeFetched() {
         RouteDefinitionLocator locator = () -> Flux.just(route(ORDERS, ORDERS_URI));
-        WebClient.Builder builder = WebClient.builder().exchangeFunction(_ -> Mono.error(new RuntimeException("down")));
+        RouteDefinitionAccessor routeAccessor = mock(RouteDefinitionAccessor.class);
+        when(routeAccessor.getPredicates(ORDERS)).thenReturn(Mono.just(java.util.Map.of()));
+        when(routeAccessor.getFilterConfigs(ORDERS)).thenReturn(Mono.just(java.util.Map.of()));
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(ignored -> Mono.error(new RuntimeException("down")));
         OpenApiRouteCustomizer customizer = mock(OpenApiRouteCustomizer.class);
-        when(customizer.mergeApiDocs(List.of())).thenReturn(Mono.just(EMPTY));
+        when(customizer.mergeApiDocs(List.of())).thenReturn(EMPTY);
 
         GatewayOpenApiAggregator aggregator = new GatewayOpenApiAggregator(
-                locator, builder, customizer, new OpenApiOverridesConfig());
+                locator, routeAccessor, builder, customizer, new OpenApiOverridesConfig());
 
         assertThat(aggregator.getUnifiedDocs().block()).isEqualTo(EMPTY);
     }
@@ -71,7 +79,8 @@ class GatewayOpenApiAggregatorTest {
     @Test
     void reportsUnknownServiceInsteadOfCallingTheClient() {
         GatewayOpenApiAggregator aggregator = new GatewayOpenApiAggregator(
-                Flux::empty, WebClient.builder(), mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig());
+                Flux::empty, mock(RouteDefinitionAccessor.class), WebClient.builder(),
+                mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig());
 
         assertThatThrownBy(() -> aggregator.getServiceDocs(MISSING).block())
                 .hasMessage("Service route not found: " + MISSING);

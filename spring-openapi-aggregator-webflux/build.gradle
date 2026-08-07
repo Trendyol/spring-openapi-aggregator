@@ -1,0 +1,51 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories { mavenCentral() }
+
+dependencies {
+    api project(':')
+    api 'org.springframework.cloud:spring-cloud-starter-gateway-server-webflux'
+    api 'org.springframework.boot:spring-boot-starter-webflux'
+    api 'org.springdoc:springdoc-openapi-starter-webflux-ui'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+sourceSets {
+    main {
+        java { srcDir 'src/main/java' }
+        resources {
+            srcDir '../src/main/resources'
+            include 'META-INF/**'
+        }
+    }
+    test {
+        java {
+            srcDir '../src/test/java'
+            include 'com/trendyol/openapiaggregator/service/OpenApiTestConstants.java'
+            include 'com/trendyol/openapiaggregator/service/RouteDefinitionAccessorTest.java'
+            include 'com/trendyol/openapiaggregator/webflux/**'
+        }
+    }
+}
+
+test { useJUnitPlatform() }
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:4.1.0"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2025.1.2"
+        mavenBom "org.springdoc:springdoc-openapi-bom:3.0.0"
+    }
+}

@@ -13,7 +13,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -58,24 +57,26 @@ public class OpenApiRouteCustomizer {
     private final ResponseCustomizationConfig config;
     private final OpenApiFilterConfig openApiFilterConfig;
     private final OpenApiInfoConfig openApiInfoConfig;
-    private final RouteDefinitionAccessor routeDefinitionAccessor;
     private final List<OpenApiFilterTransformer> filterTransformers;
 
 
-    public Mono<String> applyOpenApiCustomisations(ServiceApiDoc serviceApiDoc) {
-        return Mono.fromCallable(() -> normalizeToOpenApi3((ObjectNode) mapper.readTree(serviceApiDoc.getApiDocs())))
-                .flatMap(mutableRoot ->
-                        filterOpenApiSpecByPathAndTag(mutableRoot, serviceApiDoc.getServiceName())
-                                .then(updateRoutesForFilters(mutableRoot, serviceApiDoc.getServiceName()))
-                                .then(applyCustomResponsesByTag(mutableRoot))
-                                .then(filterPathsByRoutePredicates(mutableRoot, serviceApiDoc.getServiceName()))
-                                .then(Mono.fromCallable(() -> mapper.writeValueAsString(mutableRoot)))
-                )
-                .onErrorMap(e -> new OpenApiTransformException("Failed to apply OpenAPI customizations", (Exception) e));
+    public String applyOpenApiCustomisations(ServiceApiDoc serviceApiDoc,
+                                             Map<String, Map<String, String>> predicates,
+                                             Map<String, Object> filterConfigs) {
+        try {
+            ObjectNode mutableRoot = normalizeToOpenApi3((ObjectNode) mapper.readTree(serviceApiDoc.getApiDocs()));
+            filterOpenApiSpecByPathAndTag(mutableRoot, serviceApiDoc.getServiceName());
+            updateRoutesForFilters(mutableRoot, filterConfigs);
+            applyCustomResponsesByTag(mutableRoot);
+            filterPathsByRoutePredicates(mutableRoot, predicates);
+            return mapper.writeValueAsString(mutableRoot);
+        } catch (Exception exception) {
+            throw new OpenApiTransformException("Failed to apply OpenAPI customizations", exception);
+        }
     }
 
-    public Mono<String> mergeApiDocs(List<ServiceApiDoc> serviceDocs) {
-        return Mono.fromCallable(() -> {
+    public String mergeApiDocs(List<ServiceApiDoc> serviceDocs) {
+        try {
             if (serviceDocs.isEmpty()) {
                 return createEmptyOpenApiSpec();
             }
@@ -128,7 +129,9 @@ public class OpenApiRouteCustomizer {
             removeEmptyPaths(mergedPaths);
 
             return mapper.writeValueAsString(mergedSpec);
-        }).onErrorMap(e -> new RuntimeException("Failed to merge API docs", e));
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed to merge API docs", exception);
+        }
     }
 
     private void updateInfoSection(ObjectNode spec) {
@@ -366,26 +369,23 @@ public class OpenApiRouteCustomizer {
         return root.toString();
     }
 
-    private Mono<Void> filterPathsByRoutePredicates(ObjectNode mutableRoot, String serviceName) {
-        return routeDefinitionAccessor.getPredicates(serviceName)
-                .doOnNext(predicates -> {
-                    Map<String, String> pathPredicate = predicates.getOrDefault("Path", Map.of());
-                    List<String> pathPatterns = new ArrayList<>(pathPredicate.values());
-                    if (!pathPatterns.isEmpty()) {
-                        filterPathsByPatterns(mutableRoot, pathPatterns);
-                    }
+    private void filterPathsByRoutePredicates(ObjectNode mutableRoot,
+                                               Map<String, Map<String, String>> predicates) {
+        Map<String, String> pathPredicate = predicates.getOrDefault("Path", Map.of());
+        List<String> pathPatterns = new ArrayList<>(pathPredicate.values());
+        if (!pathPatterns.isEmpty()) {
+            filterPathsByPatterns(mutableRoot, pathPatterns);
+        }
 
-                    Map<String, String> methodPredicate = predicates.getOrDefault("Method", Map.of());
-                    if (!methodPredicate.isEmpty()) {
-                        Set<String> allowedMethods = methodPredicate.values().stream()
-                                .flatMap(value -> java.util.Arrays.stream(value.split(",")))
-                                .map(String::trim)
-                                .map(String::toLowerCase)
-                                .collect(Collectors.toSet());
-                        filterOperationsByMethods(mutableRoot, allowedMethods);
-                    }
-                })
-                .then();
+        Map<String, String> methodPredicate = predicates.getOrDefault("Method", Map.of());
+        if (!methodPredicate.isEmpty()) {
+            Set<String> allowedMethods = methodPredicate.values().stream()
+                    .flatMap(value -> java.util.Arrays.stream(value.split(",")))
+                    .map(String::trim)
+                    .map(String::toLowerCase)
+                    .collect(Collectors.toSet());
+            filterOperationsByMethods(mutableRoot, allowedMethods);
+        }
     }
 
     private void filterPathsByPatterns(ObjectNode root, List<String> pathPatterns) {
@@ -463,34 +463,25 @@ public class OpenApiRouteCustomizer {
         return pattern;
     }
 
-    private Mono<Void> updateRoutesForFilters(ObjectNode mutableRoot, String serviceName) {
-        return routeDefinitionAccessor.getFilterConfigs(serviceName)
-                .doOnNext(filterConfigs -> {
-                    filterTransformers.stream()
-                            .filter(OpenApiFilterTransformer::isEnabled)
-                            .forEach(transformer -> {
-                                Map<String, String> args = (Map<String, String>) filterConfigs.getOrDefault(transformer.getFilterName(), Map.of());
-                                if (!args.isEmpty()) {
-                                    transformer.transform(mutableRoot, args);
-                                }
-                            });
-                })
-                .then();
+    private void updateRoutesForFilters(ObjectNode mutableRoot, Map<String, Object> filterConfigs) {
+        filterTransformers.stream()
+                .filter(OpenApiFilterTransformer::isEnabled)
+                .forEach(transformer -> {
+                    Map<String, String> args = (Map<String, String>) filterConfigs.getOrDefault(transformer.getFilterName(), Map.of());
+                    if (!args.isEmpty()) {
+                        transformer.transform(mutableRoot, args);
+                    }
+                });
     }
 
-    private Mono<Void> applyCustomResponsesByTag(ObjectNode mutableRoot) {
-        return Mono.fromRunnable(() ->
-                config.getTagResponses().forEach((tag, responses) ->
-                        addResponsesToTaggedOperations(mutableRoot, tag, responses)
-                )
-        );
+    private void applyCustomResponsesByTag(ObjectNode mutableRoot) {
+        config.getTagResponses().forEach((tag, responses) ->
+                addResponsesToTaggedOperations(mutableRoot, tag, responses));
     }
 
-    private Mono<Void> filterOpenApiSpecByPathAndTag(ObjectNode mutableRoot, String serviceName) {
-        return Mono.fromRunnable(() -> {
-            filterPathsByTags(mutableRoot, serviceName);
-            filterTagsArray(mutableRoot, serviceName);
-        });
+    private void filterOpenApiSpecByPathAndTag(ObjectNode mutableRoot, String serviceName) {
+        filterPathsByTags(mutableRoot, serviceName);
+        filterTagsArray(mutableRoot, serviceName);
     }
 
     private void filterPathsByTags(ObjectNode root, String serviceName) {

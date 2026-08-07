@@ -14,7 +14,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,17 +53,12 @@ import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.TITLE;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.UNIFIED_TITLE;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.WANTED_TAG;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OpenApiRouteCustomizerTest {
     @Spy
     private ObjectMapper mapper = new ObjectMapper();
-
-    @Mock
-    private RouteDefinitionAccessor routes;
 
     @Spy
     private OpenApiFilterConfig filters = new OpenApiFilterConfig();
@@ -83,8 +77,6 @@ class OpenApiRouteCustomizerTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(routes.getPredicates(anyString())).thenReturn(Mono.just(Map.of()));
-        lenient().when(routes.getFilterConfigs(anyString())).thenReturn(Mono.just(Map.of()));
         lenient().when(transformers.stream()).thenReturn(Stream.of());
     }
 
@@ -95,8 +87,8 @@ class OpenApiRouteCustomizerTest {
         OpenApiFilterConfig.ServiceFilter filter = new OpenApiFilterConfig.ServiceFilter();
         filter.setIncludeTags(List.of(WANTED_TAG));
         filters.getFilters().put(SERVICE, filter);
-        when(routes.getPredicates(SERVICE)).thenReturn(Mono.just(Map.of(
-                "Path", Map.of("pattern", PATH_PATTERN), "Method", Map.of("_genkey_0", GET))));
+        Map<String, Map<String, String>> predicates = Map.of(
+                "Path", Map.of("pattern", PATH_PATTERN), "Method", Map.of("_genkey_0", GET));
 
         ResponseCustomizationConfig.CustomResponse response = new ResponseCustomizationConfig.CustomResponse();
         response.setStatusCode(unauthorizedStatusCode);
@@ -115,7 +107,7 @@ class OpenApiRouteCustomizerTest {
                   "/api/write":{"post":{"tags":["wanted"],"responses":{}}},
                   "/other":{"get":{"tags":["wanted"],"responses":{}}},
                   "/api/hidden":{"get":{"tags":["other"],"responses":{}}}}}
-                """)).block());
+                """), predicates, Map.of()));
 
         String pathsField = PATHS;
         String responseDescriptionPath = "/paths/~1api~1items/get/responses/" + unauthorizedStatusCode + "/description";
@@ -135,7 +127,7 @@ class OpenApiRouteCustomizerTest {
                  "securityDefinitions":{"Bearer":{"type":"apiKey","name":"Authorization","in":"header"}},
                  "paths":{"/items":{"get":{"responses":{"200":{"description":"OK",
                    "schema":{"$ref":"#/definitions/Legacy"}}}}}}}
-                """)).block());
+                """), Map.of(), Map.of()));
 
         String openApiVersion = document.path(OPENAPI).asText();
         boolean hasLegacySchema = document.path(COMPONENTS).path(SCHEMAS).has(LEGACY_SCHEMA);
@@ -159,7 +151,7 @@ class OpenApiRouteCustomizerTest {
                         {"openapi":"3.0.1","info":{},"paths":{"/items":{"post":{"operationId":"create","responses":{}}},"/other":{"get":{"operationId":"other","responses":{}}}},
                          "components":{"schemas":{"Second":{"type":"object"}},"securitySchemes":{"B":{"type":"http"}}},"tags":[{"name":"second"}]}
                         """)
-        )).block());
+        )));
 
         String firstOperationId = document.at(GET_OPERATION_POINTER).asText();
         String secondOperationId = document.at(POST_OPERATION_POINTER).asText();
@@ -179,7 +171,7 @@ class OpenApiRouteCustomizerTest {
     @Test
     void createsConfiguredEmptySpecWhenNoServicesExist() throws Exception {
         info.setTitle(CONFIGURED_TITLE);
-        JsonNode document = mapper.readTree(customizer.mergeApiDocs(List.of()).block());
+        JsonNode document = mapper.readTree(customizer.mergeApiDocs(List.of()));
 
         String openApiVersion = document.path(OPENAPI).asText();
         String configuredTitle = document.path(INFO).path(TITLE).asText();
