@@ -6,7 +6,7 @@ import com.trendyol.openapiaggregator.configuration.OpenApiInfoConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
 import com.trendyol.openapiaggregator.configuration.ResponseCustomizationConfig;
 import com.trendyol.openapiaggregator.configuration.YamlPropertySourceFactory;
-import com.trendyol.openapiaggregator.mvc.rest.GatewayOpenApiAggregator;
+import com.trendyol.openapiaggregator.mvc.rest.MvcGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -27,7 +27,7 @@ import org.springframework.web.client.RestClient;
 @ConditionalOnClass({GatewayMvcProperties.class, RestClient.class})
 @PropertySource(value = "classpath:openapi-aggregator-defaults.yml", factory = YamlPropertySourceFactory.class)
 @EnableConfigurationProperties({OpenApiFilterConfig.class, OpenApiInfoConfig.class, OpenApiOverridesConfig.class, ResponseCustomizationConfig.class})
-@Import({GatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class})
+@Import({MvcGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class})
 public class OpenApiAggregatorAutoConfiguration {
     @Bean
     RouteDefinitionAccessor routeDefinitionAccessor(GatewayMvcProperties properties) {

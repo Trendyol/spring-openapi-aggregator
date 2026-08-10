@@ -1,7 +1,7 @@
 package com.trendyol.openapiaggregator.mvc.autoconfigure;
 
 import com.trendyol.openapiaggregator.EnableOpenApiAggregator;
-import com.trendyol.openapiaggregator.mvc.rest.GatewayOpenApiAggregator;
+import com.trendyol.openapiaggregator.mvc.rest.MvcGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +27,7 @@ class OpenApiAggregatorAutoConfigurationTest {
     @Test
     void doesNotCreateAggregatorBeansWithoutEnableAnnotation() {
         contextRunner.run(context -> assertThat(context)
-                .doesNotHaveBean(GatewayOpenApiAggregator.class)
+                .doesNotHaveBean(MvcGatewayOpenApiAggregator.class)
                 .doesNotHaveBean(OpenApiRouteCustomizer.class)
                 .doesNotHaveBean(RouteDefinitionAccessor.class));
     }
@@ -37,7 +37,7 @@ class OpenApiAggregatorAutoConfigurationTest {
         contextRunner.withClassLoader(new FilteredClassLoader(RouteDefinitionLocator.class))
                 .withUserConfiguration(EnabledConfiguration.class)
                 .run(context -> assertThat(context)
-                        .hasSingleBean(GatewayOpenApiAggregator.class)
+                        .hasSingleBean(MvcGatewayOpenApiAggregator.class)
                         .hasSingleBean(OpenApiRouteCustomizer.class)
                         .hasSingleBean(RouteDefinitionAccessor.class));
     }
@@ -46,7 +46,7 @@ class OpenApiAggregatorAutoConfigurationTest {
     void backsOffWhenWebFluxGatewayIsAvailable() {
         contextRunner.withUserConfiguration(EnabledConfiguration.class)
                 .run(context -> assertThat(context)
-                        .doesNotHaveBean(GatewayOpenApiAggregator.class)
+                        .doesNotHaveBean(MvcGatewayOpenApiAggregator.class)
                         .doesNotHaveBean(OpenApiRouteCustomizer.class)
                         .doesNotHaveBean(RouteDefinitionAccessor.class));
     }

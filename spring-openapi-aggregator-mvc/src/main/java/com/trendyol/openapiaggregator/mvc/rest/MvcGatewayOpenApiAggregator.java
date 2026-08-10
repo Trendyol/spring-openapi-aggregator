@@ -6,18 +6,22 @@ import com.trendyol.openapiaggregator.dto.ServiceRoute;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cloud.gateway.server.mvc.config.RouteProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/v3/api-docs")
 @RequiredArgsConstructor
-public class GatewayOpenApiAggregator {
+public class MvcGatewayOpenApiAggregator {
     private final RouteDefinitionAccessor routeDefinitionAccessor;
     private final OpenApiRouteCustomizer customizer;
     private final OpenApiOverridesConfig overrides;
@@ -32,14 +36,16 @@ public class GatewayOpenApiAggregator {
     @GetMapping("/unified")
     public String getUnifiedDocs() {
         List<ServiceApiDoc> documents = routeDefinitionAccessor.getRoutes().stream()
-                .map(route -> new ServiceRoute(route.getId(), route.getUri().toString()))
+                .map(this::toServiceRoute)
+                .flatMap(Optional::stream)
                 .map(route -> {
                     try {
-                        return new ServiceApiDoc(route.getServiceName(), customize(route.getServiceName(), fetch(route)));
+                        return Optional.of(new ServiceApiDoc(
+                                route.getServiceName(), customize(route.getServiceName(), fetch(route))));
                     } catch (RuntimeException exception) {
-                        return null;
+                        return Optional.<ServiceApiDoc>empty();
                     }
-                }).filter(java.util.Objects::nonNull).toList();
+                }).flatMap(Optional::stream).toList();
         return customizer.mergeApiDocs(documents);
     }
 
@@ -50,14 +56,25 @@ public class GatewayOpenApiAggregator {
     }
 
     private String fetch(ServiceRoute route) {
-        return restClientBuilder.baseUrl(route.getServiceUri()).build().get()
-                .uri(baseUrl(route.getServiceName())).retrieve().body(String.class);
+        return Objects.requireNonNull(
+                restClientBuilder.baseUrl(route.getServiceUri()).build().get()
+                        .uri(baseUrl(route.getServiceName())).retrieve().body(String.class),
+                "API documentation response body must not be null");
     }
 
     private ServiceRoute route(String serviceName) {
         return routeDefinitionAccessor.getRoutes().stream().filter(route -> serviceName.equals(route.getId()))
-                .findFirst().map(route -> new ServiceRoute(route.getId(), route.getUri().toString()))
+                .findFirst().flatMap(this::toServiceRoute)
                 .orElseThrow(() -> new IllegalArgumentException("Service route not found: " + serviceName));
+    }
+
+    private Optional<ServiceRoute> toServiceRoute(RouteProperties route) {
+        String routeId = route.getId();
+        URI routeUri = route.getUri();
+        if (routeId == null || routeUri == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ServiceRoute(routeId, routeUri.toString()));
     }
 
     private String baseUrl(String serviceName) {

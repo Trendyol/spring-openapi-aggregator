@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.configuration;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.HashMap;
@@ -14,25 +15,25 @@ public class ResponseCustomizationConfig {
 
     @Data
     public static class CustomResponse {
-        private String statusCode;
-        private String description;
-        private String schemaRef;
-        private SchemaDefinition inlineSchema;
+        private @Nullable String statusCode;
+        private @Nullable String description;
+        private @Nullable String schemaRef;
+        private @Nullable SchemaDefinition inlineSchema;
     }
 
     @Data
     public static class SchemaDefinition {
-        private String type;
-        private String description;
-        private Map<String, PropertyDefinition> properties;
-        private List<String> required;
+        private @Nullable String type;
+        private @Nullable String description;
+        private @Nullable Map<String, PropertyDefinition> properties;
+        private @Nullable List<String> required;
     }
 
     @Data
     public static class PropertyDefinition {
-        private String type;
-        private String format;
-        private String description;
-        private List<String> enumValues;
+        private @Nullable String type;
+        private @Nullable String format;
+        private @Nullable String description;
+        private @Nullable List<String> enumValues;
     }
 }

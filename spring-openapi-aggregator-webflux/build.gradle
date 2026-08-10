@@ -35,7 +35,6 @@ sourceSets {
             srcDir '../src/test/java'
             include 'com/trendyol/openapiaggregator/service/OpenApiTestConstants.java'
             include 'com/trendyol/openapiaggregator/service/RouteDefinitionAccessorTest.java'
-            include 'com/trendyol/openapiaggregator/webflux/**'
         }
     }
 }

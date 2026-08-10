@@ -7,7 +7,7 @@ import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
 import com.trendyol.openapiaggregator.configuration.ResponseCustomizationConfig;
 import com.trendyol.openapiaggregator.configuration.YamlPropertySourceFactory;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
-import com.trendyol.openapiaggregator.webflux.rest.GatewayOpenApiAggregator;
+import com.trendyol.openapiaggregator.webflux.rest.ReactiveGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -26,7 +26,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ConditionalOnClass({RouteDefinitionLocator.class, WebClient.class})
 @PropertySource(value = "classpath:openapi-aggregator-defaults.yml", factory = YamlPropertySourceFactory.class)
 @EnableConfigurationProperties({OpenApiFilterConfig.class, OpenApiInfoConfig.class, OpenApiOverridesConfig.class, ResponseCustomizationConfig.class})
-@Import({GatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class, RouteDefinitionAccessor.class})
+@Import({ReactiveGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class, RouteDefinitionAccessor.class})
 public class OpenApiAggregatorAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(ObjectMapper.class)

@@ -12,9 +12,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -64,7 +66,7 @@ public class OpenApiRouteCustomizer {
                                              Map<String, Map<String, String>> predicates,
                                              Map<String, Object> filterConfigs) {
         try {
-            ObjectNode mutableRoot = normalizeToOpenApi3((ObjectNode) mapper.readTree(serviceApiDoc.getApiDocs()));
+            ObjectNode mutableRoot = normalizeToOpenApi3(readObjectNode(serviceApiDoc.getApiDocs()));
             filterOpenApiSpecByPathAndTag(mutableRoot, serviceApiDoc.getServiceName());
             updateRoutesForFilters(mutableRoot, filterConfigs);
             applyCustomResponsesByTag(mutableRoot);
@@ -81,7 +83,7 @@ public class OpenApiRouteCustomizer {
                 return createEmptyOpenApiSpec();
             }
 
-            ObjectNode mergedSpec = normalizeToOpenApi3((ObjectNode) mapper.readTree(serviceDocs.getFirst().getApiDocs()));
+            ObjectNode mergedSpec = normalizeToOpenApi3(readObjectNode(serviceDocs.getFirst().getApiDocs()));
 
             updateInfoSection(mergedSpec);
 
@@ -117,7 +119,7 @@ public class OpenApiRouteCustomizer {
 
             for (int i = 1; i < serviceDocs.size(); i++) {
                 ServiceApiDoc serviceDoc = serviceDocs.get(i);
-                ObjectNode serviceSpec = normalizeToOpenApi3((ObjectNode) mapper.readTree(serviceDoc.getApiDocs()));
+                ObjectNode serviceSpec = normalizeToOpenApi3(readObjectNode(serviceDoc.getApiDocs()));
                 String serviceName = serviceDoc.getServiceName();
 
                 mergePaths(mergedPaths, serviceSpec, serviceName);
@@ -177,6 +179,14 @@ public class OpenApiRouteCustomizer {
             paths.fields().forEachRemaining(path -> normalizePathItem((ObjectNode) path.getValue()));
         }
         return (ObjectNode) rewriteRefs(document);
+    }
+
+    private ObjectNode readObjectNode(String apiDocs) throws Exception {
+        JsonNode document = mapper.readTree(apiDocs);
+        if (document instanceof ObjectNode objectNode) {
+            return objectNode;
+        }
+        throw new IllegalArgumentException("API documentation must contain a JSON object");
     }
 
     private void normalizePathItem(ObjectNode pathItem) {
@@ -380,7 +390,7 @@ public class OpenApiRouteCustomizer {
         Map<String, String> methodPredicate = predicates.getOrDefault("Method", Map.of());
         if (!methodPredicate.isEmpty()) {
             Set<String> allowedMethods = methodPredicate.values().stream()
-                    .flatMap(value -> java.util.Arrays.stream(value.split(",")))
+                    .flatMap(value -> Arrays.stream(value.split(",")))
                     .map(String::trim)
                     .map(String::toLowerCase)
                     .collect(Collectors.toSet());
@@ -467,9 +477,16 @@ public class OpenApiRouteCustomizer {
         filterTransformers.stream()
                 .filter(OpenApiFilterTransformer::isEnabled)
                 .forEach(transformer -> {
-                    Map<String, String> args = (Map<String, String>) filterConfigs.getOrDefault(transformer.getFilterName(), Map.of());
-                    if (!args.isEmpty()) {
-                        transformer.transform(mutableRoot, args);
+                    Object configuredArgs = filterConfigs.get(transformer.getFilterName());
+                    if (configuredArgs instanceof Map<?, ?> rawArgs) {
+                        Map<String, String> args = rawArgs.entrySet().stream()
+                                .filter(entry -> entry.getKey() instanceof String && entry.getValue() instanceof String)
+                                .collect(Collectors.toMap(
+                                        entry -> (String) entry.getKey(),
+                                        entry -> (String) entry.getValue()));
+                        if (!args.isEmpty()) {
+                            transformer.transform(mutableRoot, args);
+                        }
                     }
                 });
     }
@@ -500,7 +517,7 @@ public class OpenApiRouteCustomizer {
             ObjectNode pathItem = (ObjectNode) pathEntry.getValue();
 
             // Check if path is in exclude list
-            if (excludePaths != null && excludePaths.contains(path)) {
+            if (excludePaths.contains(path)) {
                 pathsToRemove.add(path);
                 continue;
             }
@@ -516,7 +533,7 @@ public class OpenApiRouteCustomizer {
     }
 
     private boolean shouldKeepPathByTags(ObjectNode pathItem, List<String> includeTags, List<String> excludeTags) {
-        boolean hasMatchingIncludeTag = includeTags == null || includeTags.isEmpty();
+        boolean hasMatchingIncludeTag = includeTags.isEmpty();
         boolean hasMatchingExcludeTag = false;
 
         for (String method : HTTP_METHODS) {
@@ -524,7 +541,7 @@ public class OpenApiRouteCustomizer {
                 ObjectNode operation = (ObjectNode) pathItem.get(method);
 
                 // Check exclude tags
-                if (excludeTags != null && !excludeTags.isEmpty()) {
+                if (!excludeTags.isEmpty()) {
                     for (String excludeTag : excludeTags) {
                         if (hasTag(operation, excludeTag)) {
                             hasMatchingExcludeTag = true;
@@ -534,7 +551,7 @@ public class OpenApiRouteCustomizer {
                 }
 
                 // Check include tags
-                if (includeTags != null && !includeTags.isEmpty()) {
+                if (!includeTags.isEmpty()) {
                     for (String includeTag : includeTags) {
                         if (hasTag(operation, includeTag)) {
                             hasMatchingIncludeTag = true;
@@ -553,7 +570,7 @@ public class OpenApiRouteCustomizer {
         List<String> includeTags = filter.getIncludeTags();
         List<String> excludeTags = filter.getExcludeTags();
 
-        if ((includeTags == null || includeTags.isEmpty()) && (excludeTags == null || excludeTags.isEmpty())) {
+        if (includeTags.isEmpty() && excludeTags.isEmpty()) {
             return;
         }
 
@@ -570,11 +587,11 @@ public class OpenApiRouteCustomizer {
                 String tagName = tagNode.get(NAME).asText();
                 boolean shouldInclude = true;
 
-                if (includeTags != null && !includeTags.isEmpty()) {
+                if (!includeTags.isEmpty()) {
                     shouldInclude = includeTags.contains(tagName);
                 }
 
-                if (shouldInclude && excludeTags != null && !excludeTags.isEmpty()) {
+                if (shouldInclude && !excludeTags.isEmpty()) {
                     shouldInclude = !excludeTags.contains(tagName);
                 }
 
@@ -613,11 +630,10 @@ public class OpenApiRouteCustomizer {
             String statusCode = Optional.ofNullable(response.getStatusCode()).orElse("200");
 
             // Add schema if inline schema is defined
-            if (response.getInlineSchema() != null) {
-                String schemaName = extractSchemaNameFromRef(response.getSchemaRef());
-                if (schemaName != null) {
-                    addSchemaDefinition(root, schemaName, response.getInlineSchema());
-                }
+            var inlineSchema = response.getInlineSchema();
+            if (inlineSchema != null) {
+                extractSchemaNameFromRef(response.getSchemaRef())
+                        .ifPresent(schemaName -> addSchemaDefinition(root, schemaName, inlineSchema));
             }
 
             ObjectNode responseNode;
@@ -647,15 +663,15 @@ public class OpenApiRouteCustomizer {
         }
     }
 
-    private String extractSchemaNameFromRef(String schemaRef) {
+    private Optional<String> extractSchemaNameFromRef(@Nullable String schemaRef) {
         if (schemaRef == null) {
-            return null;
+            return Optional.empty();
         }
         int lastSlash = schemaRef.lastIndexOf('/');
         if (lastSlash >= 0 && lastSlash < schemaRef.length() - 1) {
-            return schemaRef.substring(lastSlash + 1);
+            return Optional.of(schemaRef.substring(lastSlash + 1));
         }
-        return null;
+        return Optional.empty();
     }
 
     private void addSchemaDefinition(ObjectNode root, String schemaName, ResponseCustomizationConfig.SchemaDefinition schemaDef) {

@@ -2,7 +2,7 @@ package com.trendyol.openapiaggregator.webflux.autoconfigure;
 
 import com.trendyol.openapiaggregator.EnableOpenApiAggregator;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
-import com.trendyol.openapiaggregator.webflux.rest.GatewayOpenApiAggregator;
+import com.trendyol.openapiaggregator.webflux.rest.ReactiveGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -23,7 +23,7 @@ class OpenApiAggregatorAutoConfigurationTest {
     @Test
     void doesNotCreateAggregatorBeansWithoutEnableAnnotation() {
         contextRunner.run(context -> assertThat(context)
-                .doesNotHaveBean(GatewayOpenApiAggregator.class)
+                .doesNotHaveBean(ReactiveGatewayOpenApiAggregator.class)
                 .doesNotHaveBean(OpenApiRouteCustomizer.class)
                 .doesNotHaveBean(RouteDefinitionAccessor.class));
     }
@@ -32,7 +32,7 @@ class OpenApiAggregatorAutoConfigurationTest {
     void createsAggregatorBeansWhenEnableAnnotationIsPresent() {
         contextRunner.withUserConfiguration(EnabledConfiguration.class)
                 .run(context -> assertThat(context)
-                        .hasSingleBean(GatewayOpenApiAggregator.class)
+                        .hasSingleBean(ReactiveGatewayOpenApiAggregator.class)
                         .hasSingleBean(OpenApiRouteCustomizer.class)
                         .hasSingleBean(RouteDefinitionAccessor.class));
     }

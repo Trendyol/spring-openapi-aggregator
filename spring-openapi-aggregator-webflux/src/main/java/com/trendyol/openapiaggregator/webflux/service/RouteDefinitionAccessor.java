@@ -11,9 +11,9 @@ import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,27 +29,53 @@ public class RouteDefinitionAccessor {
     public Mono<Map<String, Object>> getFilterConfigs(String routeId) {
         return getRouteDefinition(routeId).map(definition -> {
             Map<String, Object> filterConfigs = new LinkedHashMap<>();
-            definition.getFilters().forEach(filter -> filterConfigs.put(filter.getName(), filter.getArgs()));
+            definition.getFilters().forEach(filter -> filterConfigs.put(
+                    Objects.requireNonNull(filter.getName(), "Filter name must not be null"),
+                    filter.getArgs()));
             return filterConfigs;
         }).defaultIfEmpty(Collections.emptyMap());
     }
 
     public Mono<RouteInfo> getCompleteRouteInfo(String routeId) {
         return getRouteDefinition(routeId).map(definition -> {
-            RouteInfo info = new RouteInfo();
-            info.setId(definition.getId());
-            info.setUri(definition.getUri().toString());
-            info.setPredicates(definition.getPredicates().stream().collect(Collectors.toMap(
-                    PredicateDefinition::getName, PredicateDefinition::getArgs)));
-            info.setFilters(definition.getFilters().stream().collect(Collectors.toMap(
-                    FilterDefinition::getName, FilterDefinition::getArgs)));
-            return info;
+            Map<String, Map<String, String>> predicates = toPredicateMap(definition.getPredicates());
+            Map<String, Map<String, String>> filters = toFilterMap(definition.getFilters());
+            return new RouteInfo(
+                    Objects.requireNonNull(definition.getId(), "Route definition id must not be null"),
+                    Objects.requireNonNull(definition.getUri(), "Route definition URI must not be null").toString(),
+                    predicates,
+                    filters);
         });
     }
 
     public Mono<Map<String, Map<String, String>>> getPredicates(String routeId) {
-        return getRouteDefinition(routeId).map(definition -> definition.getPredicates().stream()
-                .collect(Collectors.toMap(PredicateDefinition::getName, PredicateDefinition::getArgs)))
+        return getRouteDefinition(routeId).map(definition -> toPredicateMap(definition.getPredicates()))
                 .defaultIfEmpty(Collections.emptyMap());
+    }
+
+    private Map<String, Map<String, String>> toPredicateMap(List<PredicateDefinition> definitions) {
+        Map<String, Map<String, String>> predicates = new LinkedHashMap<>();
+        definitions.forEach(predicate -> predicates.put(
+                Objects.requireNonNull(predicate.getName(), "Predicate name must not be null"),
+                normalizeArgs(predicate.getArgs())));
+        return predicates;
+    }
+
+    private Map<String, Map<String, String>> toFilterMap(List<FilterDefinition> definitions) {
+        Map<String, Map<String, String>> filters = new LinkedHashMap<>();
+        definitions.forEach(filter -> filters.put(
+                Objects.requireNonNull(filter.getName(), "Filter name must not be null"),
+                normalizeArgs(filter.getArgs())));
+        return filters;
+    }
+
+    private Map<String, String> normalizeArgs(Map<?, ?> arguments) {
+        Map<String, String> normalized = new LinkedHashMap<>();
+        arguments.forEach((key, value) -> {
+            if (key instanceof String stringKey && value instanceof String stringValue) {
+                normalized.put(stringKey, stringValue);
+            }
+        });
+        return normalized;
     }
 }
