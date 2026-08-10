@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.webflux.rest;
 
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,7 @@ class ReactiveGatewayOpenApiAggregatorTest {
                 mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig());
 
         assertThatThrownBy(() -> aggregator.getServiceDocs(MISSING).block())
+                .isInstanceOf(OpenApiAggregatorException.class)
                 .hasMessage("Service route not found: " + MISSING);
     }
 }

@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.mvc.service;
 
 import com.trendyol.openapiaggregator.service.GatewayRouteAccessor;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import org.springframework.cloud.gateway.server.mvc.config.GatewayMvcProperties;
 import org.springframework.cloud.gateway.server.mvc.config.RouteProperties;
 
@@ -8,7 +9,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 public class RouteDefinitionAccessor implements GatewayRouteAccessor {
@@ -23,7 +23,7 @@ public class RouteDefinitionAccessor implements GatewayRouteAccessor {
         return find(routeId).map(route -> {
             Map<String, Map<String, String>> predicates = new LinkedHashMap<>();
             route.getPredicates().forEach(predicate -> predicates.put(
-                    Objects.requireNonNull(predicate.getName(), "Predicate name must not be null"),
+                    requireName(predicate.getName(), "Predicate"),
                     normalizeArgs(predicate.getArgs())));
             return predicates;
         }).orElseGet(Collections::emptyMap);
@@ -34,7 +34,7 @@ public class RouteDefinitionAccessor implements GatewayRouteAccessor {
         return find(routeId).map(route -> {
             Map<String, Object> filters = new LinkedHashMap<>();
             route.getFilters().forEach(filter -> filters.put(
-                    Objects.requireNonNull(filter.getName(), "Filter name must not be null"),
+                    requireName(filter.getName(), "Filter"),
                     filter.getArgs()));
             return filters;
         }).orElseGet(Collections::emptyMap);
@@ -56,5 +56,12 @@ public class RouteDefinitionAccessor implements GatewayRouteAccessor {
             }
         });
         return normalized;
+    }
+
+    private String requireName(String name, String type) {
+        if (name == null) {
+            throw new OpenApiAggregatorException(type + " name must not be null");
+        }
+        return name;
     }
 }

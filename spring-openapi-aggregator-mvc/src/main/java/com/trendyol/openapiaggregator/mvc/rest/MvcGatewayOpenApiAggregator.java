@@ -3,6 +3,7 @@ package com.trendyol.openapiaggregator.mvc.rest;
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
 import com.trendyol.openapiaggregator.dto.ServiceApiDoc;
 import com.trendyol.openapiaggregator.dto.ServiceRoute;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,6 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @RestController
@@ -56,16 +56,27 @@ public class MvcGatewayOpenApiAggregator {
     }
 
     private String fetch(ServiceRoute route) {
-        return Objects.requireNonNull(
-                restClientBuilder.baseUrl(route.getServiceUri()).build().get()
-                        .uri(baseUrl(route.getServiceName())).retrieve().body(String.class),
-                "API documentation response body must not be null");
+        String body;
+        try {
+            body = restClientBuilder.baseUrl(route.getServiceUri()).build().get()
+                    .uri(baseUrl(route.getServiceName())).retrieve().body(String.class);
+        } catch (OpenApiAggregatorException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new OpenApiAggregatorException("Failed to fetch API documentation for service "
+                    + route.getServiceName(), exception);
+        }
+        if (body == null) {
+            throw new OpenApiAggregatorException("API documentation response body is missing for service "
+                    + route.getServiceName());
+        }
+        return body;
     }
 
     private ServiceRoute route(String serviceName) {
         return routeDefinitionAccessor.getRoutes().stream().filter(route -> serviceName.equals(route.getId()))
                 .findFirst().flatMap(this::toServiceRoute)
-                .orElseThrow(() -> new IllegalArgumentException("Service route not found: " + serviceName));
+                .orElseThrow(() -> new OpenApiAggregatorException("Service route not found: " + serviceName));
     }
 
     private Optional<ServiceRoute> toServiceRoute(RouteProperties route) {

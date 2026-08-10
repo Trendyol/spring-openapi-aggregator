@@ -1,7 +1,7 @@
 package com.trendyol.openapiaggregator.exception;
 
-public class OpenApiTransformException extends RuntimeException {
-    public OpenApiTransformException(String message, Exception e) {
-        super(message, e);
+public class OpenApiTransformException extends OpenApiAggregatorException {
+    public OpenApiTransformException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

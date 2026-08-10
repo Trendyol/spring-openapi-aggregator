@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.mvc.rest;
 
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -48,5 +50,19 @@ class MvcGatewayOpenApiAggregatorTest {
 
         assertThat(aggregator.getServiceDocs(ORDERS)).isEqualTo("customized");
         server.verify();
+    }
+
+    @Test
+    void reportsUnknownServiceWithAnAggregatorException() {
+        RouteDefinitionAccessor routeAccessor = mock(RouteDefinitionAccessor.class);
+        when(routeAccessor.getRoutes()).thenReturn(List.of());
+
+        MvcGatewayOpenApiAggregator aggregator = new MvcGatewayOpenApiAggregator(
+                routeAccessor, mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig(),
+                RestClient.builder());
+
+        assertThatThrownBy(() -> aggregator.getServiceDocs("missing"))
+                .isInstanceOf(OpenApiAggregatorException.class)
+                .hasMessage("Service route not found: missing");
     }
 }

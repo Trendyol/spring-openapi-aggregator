@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.webflux.service;
 
 import com.trendyol.openapiaggregator.dto.RouteInfo;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
@@ -9,6 +10,7 @@ import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,7 +32,7 @@ public class RouteDefinitionAccessor {
         return getRouteDefinition(routeId).map(definition -> {
             Map<String, Object> filterConfigs = new LinkedHashMap<>();
             definition.getFilters().forEach(filter -> filterConfigs.put(
-                    Objects.requireNonNull(filter.getName(), "Filter name must not be null"),
+                    requireName(filter.getName(), "Filter"),
                     filter.getArgs()));
             return filterConfigs;
         }).defaultIfEmpty(Collections.emptyMap());
@@ -41,8 +43,8 @@ public class RouteDefinitionAccessor {
             Map<String, Map<String, String>> predicates = toPredicateMap(definition.getPredicates());
             Map<String, Map<String, String>> filters = toFilterMap(definition.getFilters());
             return new RouteInfo(
-                    Objects.requireNonNull(definition.getId(), "Route definition id must not be null"),
-                    Objects.requireNonNull(definition.getUri(), "Route definition URI must not be null").toString(),
+                    requireName(definition.getId(), "Route definition"),
+                    requireUri(definition.getUri()),
                     predicates,
                     filters);
         });
@@ -56,7 +58,7 @@ public class RouteDefinitionAccessor {
     private Map<String, Map<String, String>> toPredicateMap(List<PredicateDefinition> definitions) {
         Map<String, Map<String, String>> predicates = new LinkedHashMap<>();
         definitions.forEach(predicate -> predicates.put(
-                Objects.requireNonNull(predicate.getName(), "Predicate name must not be null"),
+                requireName(predicate.getName(), "Predicate"),
                 normalizeArgs(predicate.getArgs())));
         return predicates;
     }
@@ -64,7 +66,7 @@ public class RouteDefinitionAccessor {
     private Map<String, Map<String, String>> toFilterMap(List<FilterDefinition> definitions) {
         Map<String, Map<String, String>> filters = new LinkedHashMap<>();
         definitions.forEach(filter -> filters.put(
-                Objects.requireNonNull(filter.getName(), "Filter name must not be null"),
+                requireName(filter.getName(), "Filter"),
                 normalizeArgs(filter.getArgs())));
         return filters;
     }
@@ -77,5 +79,19 @@ public class RouteDefinitionAccessor {
             }
         });
         return normalized;
+    }
+
+    private String requireName(String name, String type) {
+        if (name == null) {
+            throw new OpenApiAggregatorException(type + " name must not be null");
+        }
+        return name;
+    }
+
+    private String requireUri(URI uri) {
+        if (uri == null) {
+            throw new OpenApiAggregatorException("Route definition URI must not be null");
+        }
+        return uri.toString();
     }
 }

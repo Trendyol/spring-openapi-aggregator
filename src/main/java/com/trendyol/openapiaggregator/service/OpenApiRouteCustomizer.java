@@ -4,6 +4,7 @@ import com.trendyol.openapiaggregator.configuration.OpenApiFilterConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiInfoConfig;
 import com.trendyol.openapiaggregator.configuration.ResponseCustomizationConfig;
 import com.trendyol.openapiaggregator.dto.ServiceApiDoc;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.exception.OpenApiTransformException;
 import com.trendyol.openapiaggregator.transformers.OpenApiFilterTransformer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -132,7 +133,7 @@ public class OpenApiRouteCustomizer {
 
             return mapper.writeValueAsString(mergedSpec);
         } catch (Exception exception) {
-            throw new RuntimeException("Failed to merge API docs", exception);
+            throw new OpenApiAggregatorException("Failed to merge API docs", exception);
         }
     }
 
@@ -166,7 +167,7 @@ public class OpenApiRouteCustomizer {
         String basePath = document.path("basePath").asText("/");
         if (!host.isEmpty()) {
             ObjectNode server = mapper.createObjectNode();
-            server.put("url", (document.path("schemes").isArray() && document.path("schemes").size() > 0
+            server.put("url", (document.path("schemes").isArray() && !document.path("schemes").isEmpty()
                     ? document.path("schemes").get(0).asText() : "http") + "://" + host + basePath);
             document.set("servers", mapper.createArrayNode().add(server));
         }
@@ -176,7 +177,7 @@ public class OpenApiRouteCustomizer {
 
         JsonNode paths = document.get(PATHS);
         if (paths != null && paths.isObject()) {
-            paths.fields().forEachRemaining(path -> normalizePathItem((ObjectNode) path.getValue()));
+            paths.properties().forEach(path -> normalizePathItem((ObjectNode) path.getValue()));
         }
         return (ObjectNode) rewriteRefs(document);
     }
@@ -186,7 +187,7 @@ public class OpenApiRouteCustomizer {
         if (document instanceof ObjectNode objectNode) {
             return objectNode;
         }
-        throw new IllegalArgumentException("API documentation must contain a JSON object");
+        throw new OpenApiAggregatorException("API documentation must contain a JSON object");
     }
 
     private void normalizePathItem(ObjectNode pathItem) {
@@ -214,7 +215,7 @@ public class OpenApiRouteCustomizer {
                         }
                         operation.set("requestBody", requestBody);
                     } else {
-                        ObjectNode converted = (ObjectNode) parameter.deepCopy();
+                        ObjectNode converted = parameter.deepCopy();
                         converted.remove("type");
                         converted.remove("format");
                         converted.remove("items");
@@ -238,7 +239,7 @@ public class OpenApiRouteCustomizer {
 
             JsonNode responses = operation.get(RESPONSES);
             if (responses != null && responses.isObject()) {
-                responses.fields().forEachRemaining(entry -> {
+                responses.properties().forEach(entry -> {
                     if (entry.getValue() instanceof ObjectNode response && response.has(SCHEMA)) {
                         ObjectNode schema = (ObjectNode) response.remove(SCHEMA);
                         ObjectNode mediaType = mapper.createObjectNode();
@@ -255,7 +256,7 @@ public class OpenApiRouteCustomizer {
     private JsonNode rewriteRefs(JsonNode node) {
         if (node.isObject()) {
             ObjectNode object = (ObjectNode) node;
-            object.fields().forEachRemaining(entry -> {
+            object.properties().forEach(entry -> {
                 if (SCHEMA_REF.equals(entry.getKey()) && entry.getValue().isTextual()) {
                     object.put(SCHEMA_REF, entry.getValue().asText().replace("#/definitions/", "#/components/schemas/"));
                 } else {
@@ -272,16 +273,14 @@ public class OpenApiRouteCustomizer {
         JsonNode servicePathsNode = serviceSpec.path(PATHS);
         if (servicePathsNode.isObject()) {
             ObjectNode servicePaths = (ObjectNode) servicePathsNode;
-            Iterator<Map.Entry<String, JsonNode>> fields = servicePaths.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> entry = fields.next();
+            for (Map.Entry<String, JsonNode> entry : servicePaths.properties()) {
                 String path = entry.getKey();
                 ObjectNode pathItem = (ObjectNode) entry.getValue();
 
                 prefixOperationIds(pathItem, serviceName);
 
                 if (mergedPaths.has(path)) {
-                    mergePathOperations((ObjectNode) mergedPaths.get(path), pathItem, serviceName);
+                    mergePathOperations((ObjectNode) mergedPaths.get(path), pathItem);
                 } else {
                     mergedPaths.set(path, pathItem);
                 }
@@ -301,7 +300,7 @@ public class OpenApiRouteCustomizer {
         }
     }
 
-    private void mergePathOperations(ObjectNode existingPathItem, ObjectNode newPathItem, String serviceName) {
+    private void mergePathOperations(ObjectNode existingPathItem, ObjectNode newPathItem) {
         for (String method : HTTP_METHODS) {
             if (newPathItem.has(method)) {
                 ObjectNode operation = (ObjectNode) newPathItem.get(method);
@@ -317,7 +316,7 @@ public class OpenApiRouteCustomizer {
             JsonNode schemasNode = components.path(SCHEMAS);
             if (schemasNode.isObject()) {
                 ObjectNode schemas = (ObjectNode) schemasNode;
-                schemas.fields().forEachRemaining(entry -> mergedSchemas.set(entry.getKey(), entry.getValue()));
+                schemas.properties().forEach(entry -> mergedSchemas.set(entry.getKey(), entry.getValue()));
             }
         }
     }
@@ -334,7 +333,7 @@ public class OpenApiRouteCustomizer {
     }
 
     private void mergeScheme(ObjectNode mergedScheme, JsonNode targetNode) {
-        targetNode.fields().forEachRemaining(entry -> {
+        targetNode.properties().forEach(entry -> {
             String schemeName = entry.getKey();
             JsonNode schemeNode = entry.getValue();
             if (mergedScheme.has(schemeName)) {
@@ -400,7 +399,7 @@ public class OpenApiRouteCustomizer {
 
     private void filterPathsByPatterns(ObjectNode root, List<String> pathPatterns) {
         ObjectNode paths = ensureNode(root, PATHS);
-        Iterator<Map.Entry<String, JsonNode>> fields = paths.fields();
+        Iterator<Map.Entry<String, JsonNode>> fields = paths.properties().iterator();
         List<String> pathsToRemove = new ArrayList<>();
         Set<String> matchingPaths = new HashSet<>();
 
@@ -426,7 +425,7 @@ public class OpenApiRouteCustomizer {
 
     private void filterOperationsByMethods(ObjectNode root, Set<String> allowedMethods) {
         ObjectNode paths = ensureNode(root, PATHS);
-        paths.fields().forEachRemaining(entry -> {
+        paths.properties().forEach(entry -> {
             if (entry.getValue() instanceof ObjectNode pathItem) {
                 HTTP_METHODS.stream()
                         .filter(method -> !allowedMethods.contains(method))
@@ -438,7 +437,7 @@ public class OpenApiRouteCustomizer {
 
     private void removeEmptyPaths(ObjectNode paths) {
         List<String> emptyPaths = new ArrayList<>();
-        paths.fields().forEachRemaining(entry -> {
+        paths.properties().forEach(entry -> {
             if (entry.getValue() instanceof ObjectNode pathItem
                     && HTTP_METHODS.stream().noneMatch(pathItem::has)) {
                 emptyPaths.add(entry.getKey());
@@ -454,7 +453,7 @@ public class OpenApiRouteCustomizer {
         }
 
         // Convert path variables {var} to regex BEFORE escaping
-        pattern = pattern.replaceAll("\\{[^}]+\\}", "<<PATH_VAR>>");
+        pattern = pattern.replaceAll("\\{[^}]+}", "<<PATH_VAR>>");
 
         // Convert wildcards to placeholders BEFORE escaping
         pattern = pattern.replace("**", "<<DOUBLE_WILDCARD>>");
@@ -508,7 +507,7 @@ public class OpenApiRouteCustomizer {
         List<String> excludePaths = filter.getExcludePaths();
 
         ObjectNode paths = ensureNode(root, PATHS);
-        Iterator<Map.Entry<String, JsonNode>> fields = paths.fields();
+        Iterator<Map.Entry<String, JsonNode>> fields = paths.properties().iterator();
         List<String> pathsToRemove = new ArrayList<>();
 
         while (fields.hasNext()) {
@@ -608,7 +607,7 @@ public class OpenApiRouteCustomizer {
     private void addResponsesToTaggedOperations(ObjectNode root, String tag, List<ResponseCustomizationConfig.CustomResponse> responses) {
         ObjectNode paths = ensureNode(root, PATHS);
 
-        paths.fields().forEachRemaining(pathEntry -> {
+        paths.properties().forEach(pathEntry -> {
             ObjectNode pathItem = (ObjectNode) pathEntry.getValue();
 
             for (String method : HTTP_METHODS) {

@@ -3,6 +3,7 @@ package com.trendyol.openapiaggregator.webflux.rest;
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
 import com.trendyol.openapiaggregator.dto.ServiceApiDoc;
 import com.trendyol.openapiaggregator.dto.ServiceRoute;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import lombok.RequiredArgsConstructor;
@@ -74,12 +75,16 @@ public class ReactiveGatewayOpenApiAggregator {
                 .flatMap(route -> {
                     URI routeUri = route.getUri();
                     if (routeUri == null) {
-                        return Mono.error(new IllegalArgumentException("Service route has no URI: " + serviceName));
+                        return Mono.error(new OpenApiAggregatorException("Service route has no URI: " + serviceName));
                     }
                     return Mono.just(routeUri + getBaseUrl(serviceName));
                 })
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Service route not found: " + serviceName)))
-                .flatMap(uri -> webClientBuilder.build().get().uri(uri).retrieve().bodyToMono(String.class));
+                .switchIfEmpty(Mono.error(new OpenApiAggregatorException("Service route not found: " + serviceName)))
+                .flatMap(uri -> webClientBuilder.build().get().uri(uri).retrieve().bodyToMono(String.class))
+                .onErrorMap(error -> error instanceof OpenApiAggregatorException
+                        ? error
+                        : new OpenApiAggregatorException("Failed to fetch API documentation for service "
+                        + serviceName, error));
     }
 
     private Mono<ServiceRoute> toServiceRoute(RouteDefinition route) {
