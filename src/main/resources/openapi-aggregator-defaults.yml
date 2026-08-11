@@ -1,7 +1,7 @@
 openapi:
   aggregator:
     cache:
-      enabled: false
+      enabled: true
       ttl: 10m
       # Optional; required only when multiple CacheManager beans are present.
       # cache-manager-name: myCacheManager

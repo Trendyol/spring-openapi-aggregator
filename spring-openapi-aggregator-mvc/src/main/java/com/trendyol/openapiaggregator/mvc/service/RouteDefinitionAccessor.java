@@ -1,7 +1,8 @@
 package com.trendyol.openapiaggregator.mvc.service;
 
-import com.trendyol.openapiaggregator.service.GatewayRouteAccessor;
 import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
+import com.trendyol.openapiaggregator.service.GatewayRouteAccessor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.cloud.gateway.server.mvc.config.GatewayMvcProperties;
 import org.springframework.cloud.gateway.server.mvc.config.RouteProperties;
 
@@ -58,7 +59,7 @@ public class RouteDefinitionAccessor implements GatewayRouteAccessor {
         return normalized;
     }
 
-    private String requireName(String name, String type) {
+    private String requireName(@Nullable String name, String type) {
         if (name == null) {
             throw new OpenApiAggregatorException(type + " name must not be null");
         }
