@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,7 +51,6 @@ import static com.trendyol.openapiaggregator.constants.OpenApiConstants.TYPE;
 import static com.trendyol.openapiaggregator.constants.OpenApiConstants.VERSION;
 
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class OpenApiRouteCustomizer {
 
@@ -97,6 +95,8 @@ public class OpenApiRouteCustomizer {
                 mergedPaths = (ObjectNode) pathsNode;
             }
 
+            prefixOperationIdsInPaths(mergedPaths, serviceDocs.getFirst().getServiceName());
+
             ObjectNode mergedComponents = ensureNode(mergedSpec, COMPONENTS);
             ObjectNode mergedSchemas = ensureNode(mergedComponents, SCHEMAS);
             ObjectNode mergedSecuritySchemes = ensureNode(mergedComponents, SECURITY_SCHEMES);
@@ -132,6 +132,8 @@ public class OpenApiRouteCustomizer {
             removeEmptyPaths(mergedPaths);
 
             return mapper.writeValueAsString(mergedSpec);
+        } catch (OpenApiAggregatorException exception) {
+            throw exception;
         } catch (Exception exception) {
             throw new OpenApiAggregatorException("Failed to merge API docs", exception);
         }
@@ -275,17 +277,31 @@ public class OpenApiRouteCustomizer {
             ObjectNode servicePaths = (ObjectNode) servicePathsNode;
             for (Map.Entry<String, JsonNode> entry : servicePaths.properties()) {
                 String path = entry.getKey();
-                ObjectNode pathItem = (ObjectNode) entry.getValue();
+                if (!(entry.getValue() instanceof ObjectNode pathItem)) {
+                    throw new OpenApiAggregatorException("Path is not an object while merging service "
+                            + serviceName + ": " + path);
+                }
 
                 prefixOperationIds(pathItem, serviceName);
 
                 if (mergedPaths.has(path)) {
-                    mergePathOperations((ObjectNode) mergedPaths.get(path), pathItem);
+                    if (!(mergedPaths.get(path) instanceof ObjectNode existingPathItem)) {
+                        throw new OpenApiAggregatorException("Path is not an object while merging: " + path);
+                    }
+                    mergePathOperations(existingPathItem, pathItem, serviceName, path);
                 } else {
                     mergedPaths.set(path, pathItem);
                 }
             }
         }
+    }
+
+    private void prefixOperationIdsInPaths(ObjectNode paths, String serviceName) {
+        paths.properties().forEach(entry -> {
+            if (entry.getValue() instanceof ObjectNode pathItem) {
+                prefixOperationIds(pathItem, serviceName);
+            }
+        });
     }
 
     private void prefixOperationIds(ObjectNode pathItem, String serviceName) {
@@ -300,9 +316,14 @@ public class OpenApiRouteCustomizer {
         }
     }
 
-    private void mergePathOperations(ObjectNode existingPathItem, ObjectNode newPathItem) {
+    private void mergePathOperations(ObjectNode existingPathItem, ObjectNode newPathItem,
+                                     String serviceName, String path) {
         for (String method : HTTP_METHODS) {
             if (newPathItem.has(method)) {
+                if (existingPathItem.has(method)) {
+                    throw new OpenApiAggregatorException("Conflicting " + method.toUpperCase()
+                            + " operation while merging service " + serviceName + " at path " + path);
+                }
                 ObjectNode operation = (ObjectNode) newPathItem.get(method);
                 existingPathItem.set(method, operation);
             }
@@ -316,7 +337,13 @@ public class OpenApiRouteCustomizer {
             JsonNode schemasNode = components.path(SCHEMAS);
             if (schemasNode.isObject()) {
                 ObjectNode schemas = (ObjectNode) schemasNode;
-                schemas.properties().forEach(entry -> mergedSchemas.set(entry.getKey(), entry.getValue()));
+                schemas.properties().forEach(entry -> {
+                    JsonNode existing = mergedSchemas.get(entry.getKey());
+                    if (existing != null && !existing.equals(entry.getValue())) {
+                        throw new OpenApiAggregatorException("Conflicting schema while merging: " + entry.getKey());
+                    }
+                    mergedSchemas.set(entry.getKey(), entry.getValue());
+                });
             }
         }
     }
@@ -337,7 +364,10 @@ public class OpenApiRouteCustomizer {
             String schemeName = entry.getKey();
             JsonNode schemeNode = entry.getValue();
             if (mergedScheme.has(schemeName)) {
-                ((ObjectNode) mergedScheme.get(schemeName)).setAll((ObjectNode) schemeNode);
+                if (!mergedScheme.get(schemeName).equals(schemeNode)) {
+                    throw new OpenApiAggregatorException(
+                            "Conflicting security scheme while merging: " + schemeName);
+                }
             } else {
                 mergedScheme.set(schemeName, schemeNode);
             }

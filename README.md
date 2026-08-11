@@ -36,10 +36,12 @@ The library exposes:
 
 Configuration is provided under `openapi.aggregator`. The library supports route predicates, tag and path filters, OpenAPI metadata, route-specific document paths, response customization, and custom filter transformers.
 
+Caching is disabled by default. When enabled, the service and unified API documents are stored in the configured cache. See [caching](documents/caching.md) for Spring `CacheManager` integration and configuration.
+
 ## How it works
 
-1. The aggregator resolves the route and fetches its API document with `WebClient`.
-2. The selected adapter fetches the document using the application transport. WebFlux remains reactive and MVC remains synchronous.
+1. The aggregator resolves the route and fetches its API document using the selected adapter's transport.
+2. WebFlux remains reactive with `WebClient`, while MVC remains synchronous with `RestClient`.
 3. Swagger 2.0 documents are converted to OpenAPI 3.0.1.
 4. Route predicates and configured filters limit paths and operations exposed by the route.
 5. Custom responses and application-provided transformers update the document.

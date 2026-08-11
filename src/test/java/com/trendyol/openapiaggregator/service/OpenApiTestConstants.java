@@ -35,7 +35,7 @@ public final class OpenApiTestConstants {
     public static final String SCHEMAS = "schemas";
     public static final String SECURITY_SCHEMES = "securitySchemes";
     public static final String REQUIRED = "required";
-    public static final String OPERATION_LIST = "list";
+    public static final String OPERATION_LIST = "first_list";
     public static final String OPERATION_CREATE = "second_create";
     public static final String UNIFIED_TITLE = "Unified Gateway API";
     public static final String FIRST_SCHEMA = "First";

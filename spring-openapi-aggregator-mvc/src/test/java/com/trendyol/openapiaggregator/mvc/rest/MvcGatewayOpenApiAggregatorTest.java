@@ -1,11 +1,15 @@
 package com.trendyol.openapiaggregator.mvc.rest;
 
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
+import com.trendyol.openapiaggregator.configuration.OpenApiCacheConfig;
 import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
+import com.trendyol.openapiaggregator.service.OpenApiAggregatorCacheService;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.server.mvc.config.RouteProperties;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -46,7 +50,7 @@ class MvcGatewayOpenApiAggregatorTest {
                 .andRespond(withSuccess("{\"openapi\":\"3.0.1\",\"paths\":{}}", MediaType.APPLICATION_JSON));
 
         MvcGatewayOpenApiAggregator aggregator = new MvcGatewayOpenApiAggregator(
-                routeAccessor, customizer, new OpenApiOverridesConfig(), builder);
+                routeAccessor, customizer, new OpenApiOverridesConfig(), builder, disabledCache());
 
         assertThat(aggregator.getServiceDocs(ORDERS)).isEqualTo("customized");
         server.verify();
@@ -59,10 +63,15 @@ class MvcGatewayOpenApiAggregatorTest {
 
         MvcGatewayOpenApiAggregator aggregator = new MvcGatewayOpenApiAggregator(
                 routeAccessor, mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig(),
-                RestClient.builder());
+                RestClient.builder(), disabledCache());
 
         assertThatThrownBy(() -> aggregator.getServiceDocs("missing"))
                 .isInstanceOf(OpenApiAggregatorException.class)
                 .hasMessage("Service route not found: missing");
+    }
+
+    private static OpenApiAggregatorCacheService disabledCache() {
+        return new OpenApiAggregatorCacheService(new OpenApiCacheConfig(),
+                mock(ObjectProvider.class), mock(BeanFactory.class));
     }
 }

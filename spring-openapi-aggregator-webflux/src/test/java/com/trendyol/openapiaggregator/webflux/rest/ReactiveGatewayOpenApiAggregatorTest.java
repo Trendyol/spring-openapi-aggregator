@@ -1,12 +1,16 @@
 package com.trendyol.openapiaggregator.webflux.rest;
 
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
+import com.trendyol.openapiaggregator.configuration.OpenApiCacheConfig;
 import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
+import com.trendyol.openapiaggregator.service.OpenApiAggregatorCacheService;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -58,7 +62,7 @@ class ReactiveGatewayOpenApiAggregatorTest {
         overrides.getOverrides().put(ORDERS, service);
 
         ReactiveGatewayOpenApiAggregator aggregator = new ReactiveGatewayOpenApiAggregator(
-                locator, routeAccessor, builder, customizer, overrides);
+                locator, routeAccessor, builder, customizer, overrides, disabledCache());
 
         assertThat(aggregator.getServiceDocs(ORDERS).block()).isEqualTo(CUSTOMIZED);
     }
@@ -74,7 +78,7 @@ class ReactiveGatewayOpenApiAggregatorTest {
         when(customizer.mergeApiDocs(List.of())).thenReturn(EMPTY);
 
         ReactiveGatewayOpenApiAggregator aggregator = new ReactiveGatewayOpenApiAggregator(
-                locator, routeAccessor, builder, customizer, new OpenApiOverridesConfig());
+                locator, routeAccessor, builder, customizer, new OpenApiOverridesConfig(), disabledCache());
 
         assertThat(aggregator.getUnifiedDocs().block()).isEqualTo(EMPTY);
     }
@@ -83,10 +87,30 @@ class ReactiveGatewayOpenApiAggregatorTest {
     void reportsUnknownServiceInsteadOfCallingTheClient() {
         ReactiveGatewayOpenApiAggregator aggregator = new ReactiveGatewayOpenApiAggregator(
                 Flux::empty, mock(RouteDefinitionAccessor.class), WebClient.builder(),
-                mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig());
+                mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig(), disabledCache());
 
         assertThatThrownBy(() -> aggregator.getServiceDocs(MISSING).block())
                 .isInstanceOf(OpenApiAggregatorException.class)
                 .hasMessage("Service route not found: " + MISSING);
+    }
+
+    @Test
+    void reportsMissingServiceDocumentBody() {
+        RouteDefinitionLocator locator = () -> Flux.just(route(ORDERS, ORDERS_URI));
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(ignored ->
+                Mono.just(ClientResponse.create(HttpStatus.OK).build()));
+
+        ReactiveGatewayOpenApiAggregator aggregator = new ReactiveGatewayOpenApiAggregator(
+                locator, mock(RouteDefinitionAccessor.class), builder,
+                mock(OpenApiRouteCustomizer.class), new OpenApiOverridesConfig(), disabledCache());
+
+        assertThatThrownBy(() -> aggregator.getServiceDocs(ORDERS).block())
+                .isInstanceOf(OpenApiAggregatorException.class)
+                .hasMessage("API documentation response body is missing for service " + ORDERS);
+    }
+
+    private static OpenApiAggregatorCacheService disabledCache() {
+        return new OpenApiAggregatorCacheService(new OpenApiCacheConfig(),
+                mock(ObjectProvider.class), mock(BeanFactory.class));
     }
 }

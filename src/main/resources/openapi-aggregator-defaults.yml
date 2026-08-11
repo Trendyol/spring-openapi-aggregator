@@ -1,3 +1,12 @@
+openapi:
+  aggregator:
+    cache:
+      enabled: false
+      ttl: 10m
+      # Optional; required only when multiple CacheManager beans are present.
+      # cache-manager-name: myCacheManager
+      # Optional; uses the first cache exposed by the selected CacheManager when omitted.
+      # cache-name: myCache
 springdoc:
   api-docs:
     enabled: true

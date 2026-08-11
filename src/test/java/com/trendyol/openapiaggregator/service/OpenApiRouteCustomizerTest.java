@@ -4,6 +4,7 @@ import com.trendyol.openapiaggregator.configuration.OpenApiFilterConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiInfoConfig;
 import com.trendyol.openapiaggregator.configuration.ResponseCustomizationConfig;
 import com.trendyol.openapiaggregator.dto.ServiceApiDoc;
+import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import com.trendyol.openapiaggregator.transformers.OpenApiFilterTransformer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,6 +54,7 @@ import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.TITLE;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.UNIFIED_TITLE;
 import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.WANTED_TAG;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
@@ -180,5 +182,16 @@ class OpenApiRouteCustomizerTest {
         assertThat(openApiVersion).isEqualTo(OPENAPI_VERSION);
         assertThat(configuredTitle).isEqualTo(CONFIGURED_TITLE);
         assertThat(paths).isEmpty();
+    }
+
+    @Test
+    void rejectsConflictingOperationsDuringMerge() {
+        assertThatThrownBy(() -> customizer.mergeApiDocs(List.of(
+                new ServiceApiDoc(FIRST_SERVICE,
+                        "{\"openapi\":\"3.0.1\",\"paths\":{\"/items\":{\"get\":{}}}}"),
+                new ServiceApiDoc(SECOND_SERVICE,
+                        "{\"openapi\":\"3.0.1\",\"paths\":{\"/items\":{\"get\":{}}}}"))))
+                .isInstanceOf(OpenApiAggregatorException.class)
+                .hasMessageContaining("Conflicting GET operation");
     }
 }

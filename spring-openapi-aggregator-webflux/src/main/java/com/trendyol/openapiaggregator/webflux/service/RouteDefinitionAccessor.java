@@ -3,11 +3,11 @@ package com.trendyol.openapiaggregator.webflux.service;
 import com.trendyol.openapiaggregator.dto.RouteInfo;
 import com.trendyol.openapiaggregator.exception.OpenApiAggregatorException;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
-import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
 @RequiredArgsConstructor
 public class RouteDefinitionAccessor {
     private final RouteDefinitionLocator routeDefinitionLocator;
@@ -81,14 +80,14 @@ public class RouteDefinitionAccessor {
         return normalized;
     }
 
-    private String requireName(String name, String type) {
+    private String requireName(@Nullable String name, String type) {
         if (name == null) {
             throw new OpenApiAggregatorException(type + " name must not be null");
         }
         return name;
     }
 
-    private String requireUri(URI uri) {
+    private String requireUri(@Nullable URI uri) {
         if (uri == null) {
             throw new OpenApiAggregatorException("Route definition URI must not be null");
         }

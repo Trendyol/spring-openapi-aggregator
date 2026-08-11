@@ -1,6 +1,7 @@
 package com.trendyol.openapiaggregator.mvc.autoconfigure;
 
 import com.trendyol.openapiaggregator.EnableOpenApiAggregator;
+import com.trendyol.openapiaggregator.configuration.OpenApiCacheConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiFilterConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiInfoConfig;
 import com.trendyol.openapiaggregator.configuration.OpenApiOverridesConfig;
@@ -8,12 +9,13 @@ import com.trendyol.openapiaggregator.configuration.ResponseCustomizationConfig;
 import com.trendyol.openapiaggregator.configuration.YamlPropertySourceFactory;
 import com.trendyol.openapiaggregator.mvc.rest.MvcGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.mvc.service.RouteDefinitionAccessor;
+import com.trendyol.openapiaggregator.service.OpenApiAggregatorCacheService;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.server.mvc.config.GatewayMvcProperties;
 import org.springframework.context.annotation.Bean;
@@ -26,8 +28,8 @@ import org.springframework.web.client.RestClient;
 @ConditionalOnMissingClass("org.springframework.cloud.gateway.route.RouteDefinitionLocator")
 @ConditionalOnClass({GatewayMvcProperties.class, RestClient.class})
 @PropertySource(value = "classpath:openapi-aggregator-defaults.yml", factory = YamlPropertySourceFactory.class)
-@EnableConfigurationProperties({OpenApiFilterConfig.class, OpenApiInfoConfig.class, OpenApiOverridesConfig.class, ResponseCustomizationConfig.class})
-@Import({MvcGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class})
+@EnableConfigurationProperties({OpenApiFilterConfig.class, OpenApiInfoConfig.class, OpenApiOverridesConfig.class, ResponseCustomizationConfig.class, OpenApiCacheConfig.class})
+@Import({MvcGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class, OpenApiAggregatorCacheService.class})
 public class OpenApiAggregatorAutoConfiguration {
     @Bean
     RouteDefinitionAccessor routeDefinitionAccessor(GatewayMvcProperties properties) {

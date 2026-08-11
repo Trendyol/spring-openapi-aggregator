@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +36,14 @@ class OpenApiAggregatorAutoConfigurationTest {
                         .hasSingleBean(ReactiveGatewayOpenApiAggregator.class)
                         .hasSingleBean(OpenApiRouteCustomizer.class)
                         .hasSingleBean(RouteDefinitionAccessor.class));
+    }
+
+    @Test
+    void backsOffWhenApplicationProvidesWebClientBuilder() {
+        contextRunner.withBean(WebClient.Builder.class, WebClient::builder)
+                .withUserConfiguration(EnabledConfiguration.class)
+                .run(context -> assertThat(context.getBeansOfType(WebClient.Builder.class))
+                        .hasSize(1));
     }
 
     @Configuration(proxyBeanMethods = false)
