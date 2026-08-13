@@ -18,3 +18,15 @@ public class ExampleTransformer implements OpenApiFilterTransformer {
 ```
 
 The transformer is invoked when the route contains a filter with the matching name. Return `false` from `isEnabled()` when the transformer should be disabled.
+
+Built-in or application-provided transformers can also be disabled globally:
+
+```yaml
+openapi:
+  aggregator:
+    disabled-transformers:
+      - RewritePath
+      - SetPath
+```
+
+The entries must match the value returned by `getFilterName()`.

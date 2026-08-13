@@ -1,5 +1,7 @@
 openapi:
   aggregator:
+    # Optional filter transformer names to disable globally.
+    # disabled-transformers: [RewritePath, SetPath]
     cache:
       enabled: true
       ttl: 10m

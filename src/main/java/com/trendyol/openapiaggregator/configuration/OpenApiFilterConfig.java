@@ -12,6 +12,7 @@ import java.util.Map;
 @Data
 public class OpenApiFilterConfig {
     private Map<String, ServiceFilter> filters = new HashMap<>();
+    private List<String> disabledTransformers = List.of();
 
     @Data
     @NoArgsConstructor

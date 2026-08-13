@@ -504,7 +504,8 @@ public class OpenApiRouteCustomizer {
 
     private void updateRoutesForFilters(ObjectNode mutableRoot, Map<String, Object> filterConfigs) {
         filterTransformers.stream()
-                .filter(OpenApiFilterTransformer::isEnabled)
+                .filter(transformer -> transformer.isEnabled()
+                        && !openApiFilterConfig.getDisabledTransformers().contains(transformer.getFilterName()))
                 .forEach(transformer -> {
                     Object configuredArgs = filterConfigs.get(transformer.getFilterName());
                     if (configuredArgs instanceof Map<?, ?> rawArgs) {

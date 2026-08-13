@@ -56,6 +56,9 @@ import static com.trendyol.openapiaggregator.service.OpenApiTestConstants.WANTED
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OpenApiRouteCustomizerTest {
@@ -73,6 +76,9 @@ class OpenApiRouteCustomizerTest {
 
     @Mock
     private List<OpenApiFilterTransformer> transformers;
+
+    @Mock
+    private OpenApiFilterTransformer disabledTransformer;
 
     @InjectMocks
     private OpenApiRouteCustomizer customizer;
@@ -120,6 +126,20 @@ class OpenApiRouteCustomizerTest {
         assertThat(document.path(pathsField).fieldNames()).toIterable().containsExactly(API_ITEMS_PATH);
         assertThat(responseDescription).isEqualTo(challengeDescription);
         assertThat(schemaRequired).isEqualTo("[\"" + CHALLENGE_ID + "\"]");
+    }
+
+    @Test
+    void doesNotApplyConfiguredDisabledTransformer() {
+        filters.setDisabledTransformers(List.of("RewritePath"));
+        when(disabledTransformer.isEnabled()).thenReturn(true);
+        when(disabledTransformer.getFilterName()).thenReturn("RewritePath");
+        when(transformers.stream()).thenReturn(Stream.of(disabledTransformer));
+
+        customizer.applyOpenApiCustomisations(new ServiceApiDoc(SERVICE,
+                "{\"openapi\":\"3.0.1\",\"paths\":{\"/items\":{\"get\":{}}}}"),
+                Map.of(), Map.of("RewritePath", Map.of("regexp", "/items", "replacement", "/new")));
+
+        verify(disabledTransformer, never()).transform(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyMap());
     }
 
     @Test

@@ -11,6 +11,12 @@ import com.trendyol.openapiaggregator.service.OpenApiAggregatorCacheService;
 import com.trendyol.openapiaggregator.service.OpenApiRouteCustomizer;
 import com.trendyol.openapiaggregator.webflux.rest.ReactiveGatewayOpenApiAggregator;
 import com.trendyol.openapiaggregator.webflux.service.RouteDefinitionAccessor;
+import com.trendyol.openapiaggregator.transformers.PrefixPathOpenApiFilterTransformer;
+import com.trendyol.openapiaggregator.transformers.AddRequestParameterOpenApiFilterTransformer;
+import com.trendyol.openapiaggregator.transformers.RemoveRequestParameterOpenApiFilterTransformer;
+import com.trendyol.openapiaggregator.transformers.RewritePathOpenApiFilterTransformer;
+import com.trendyol.openapiaggregator.transformers.SetPathOpenApiFilterTransformer;
+import com.trendyol.openapiaggregator.transformers.StripPrefixOpenApiFilterTransformer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -28,7 +34,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ConditionalOnClass({RouteDefinitionLocator.class, WebClient.class})
 @PropertySource(value = "classpath:openapi-aggregator-defaults.yml", factory = YamlPropertySourceFactory.class)
 @EnableConfigurationProperties({OpenApiFilterConfig.class, OpenApiInfoConfig.class, OpenApiOverridesConfig.class, ResponseCustomizationConfig.class, OpenApiCacheConfig.class})
-@Import({ReactiveGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class, RouteDefinitionAccessor.class, OpenApiAggregatorCacheService.class})
+@Import({ReactiveGatewayOpenApiAggregator.class, OpenApiRouteCustomizer.class, RouteDefinitionAccessor.class,
+        OpenApiAggregatorCacheService.class, PrefixPathOpenApiFilterTransformer.class,
+        AddRequestParameterOpenApiFilterTransformer.class, RemoveRequestParameterOpenApiFilterTransformer.class,
+        StripPrefixOpenApiFilterTransformer.class, RewritePathOpenApiFilterTransformer.class,
+        SetPathOpenApiFilterTransformer.class})
 public class OpenApiAggregatorAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
